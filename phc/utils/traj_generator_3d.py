@@ -38,11 +38,17 @@ class TrajGenerator3D():
         self.heading = torch.zeros(num_envs, 1)
         self.raise_time = 0.25 # Time for going stright up. 
         
+        self.omnigrasp_rot = None
         if flags.real_traj:
             # self.omnigrasp_path = joblib.load("data/omnigrasp_points.pkl")
             # self.omnigrasp_path = joblib.load("data/question_points.pkl")
-            self.omnigrasp_path = joblib.load("data/neurips_points.pkl")
-            self.omnigrasp_path = torch.from_numpy(self.omnigrasp_path).float().to(self._device)
+            real_traj_path = traj_config.get('real_traj_path', 'data/custom_stick_traj.pkl')
+            loaded_traj = joblib.load(real_traj_path)
+            if isinstance(loaded_traj, dict):
+                self.omnigrasp_path = torch.from_numpy(loaded_traj["pos"]).float().to(self._device)
+                self.omnigrasp_rot = torch.from_numpy(loaded_traj["rot"]).float().to(self._device)
+            else:
+                self.omnigrasp_path = torch.from_numpy(loaded_traj).float().to(self._device)
         return
         
     def sample_dtheat_dspeed(self, n):
@@ -140,16 +146,23 @@ class TrajGenerator3D():
 
             ending_rot = torch.from_numpy(sRot.random(n).as_quat()).to(init_pos)
             ###################################
+            vert_rot = None
             if flags.real_traj:
                 lift_num_frames = int(1 / self._dt)
                 vert_pos = torch.zeros([n, self.get_num_verts() - 1, 3], device=self._device)
                 vert_pos[:, :lift_num_frames, 2] = torch.linspace(0, 1, lift_num_frames).to(vert_pos) * 0.3 # Z direction
                 vert_pos[:, lift_num_frames:, 2] = 0.3
-                omnigrasp_path = self.omnigrasp_path[None, ] 
+                omnigrasp_path = self.omnigrasp_path[None, ]
                 vert_pos[:, lift_num_frames:lift_num_frames+omnigrasp_path.shape[1], :] = omnigrasp_path
                 vert_pos[:, lift_num_frames+omnigrasp_path.shape[1]:, :] = omnigrasp_path[:, -1, :]
                 vert_pos[:, lift_num_frames+omnigrasp_path.shape[1]:, 0] -= torch.arange(self.get_num_verts() - 1 - (lift_num_frames+omnigrasp_path.shape[1])).to(vert_pos) * 0.05
                 ending_rot = init_rot
+
+                if self.omnigrasp_rot is not None:
+                    omnigrasp_rot = self.omnigrasp_rot[None, ].repeat(n, 1, 1)
+                    vert_rot = init_rot[:, None, :].repeat(1, self.get_num_verts() - 1, 1)
+                    vert_rot[:, lift_num_frames:lift_num_frames + omnigrasp_rot.shape[1], :] = omnigrasp_rot
+                    vert_rot[:, lift_num_frames + omnigrasp_rot.shape[1]:, :] = omnigrasp_rot[:, -1:, :]
             ###################################
             
             vert_pos = vert_pos - (vert_pos[:, 0:1, :] - init_pos[:, None, :])  
@@ -167,8 +180,12 @@ class TrajGenerator3D():
             num_verts = self.get_num_verts()
             slerp_weights = (torch.arange(num_verts - starting_still_frames)/(num_verts - starting_still_frames)).repeat(n, 1).to(init_pos)
             slerp_weights = torch.cat([torch.zeros([n, starting_still_frames]).to(init_pos), slerp_weights], dim = -1)
-            
-            self.grs[env_ids] = torch_utils.slerp(init_rot[:, None].repeat(1, num_verts, 1).view(-1, 4), ending_rot[:, None].repeat(1, num_verts, 1).view(-1, 4), slerp_weights.view(-1, 1)).view(n, self.get_num_verts(), -1)            
+
+            if vert_rot is not None:
+                self.grs[env_ids, :starting_still_frames] = init_rot[:, None, :]
+                self.grs[env_ids, (starting_still_frames):] = vert_rot[:, :-(starting_still_frames - 1)]
+            else:
+                self.grs[env_ids] = torch_utils.slerp(init_rot[:, None].repeat(1, num_verts, 1).view(-1, 4), ending_rot[:, None].repeat(1, num_verts, 1).view(-1, 4), slerp_weights.view(-1, 1)).view(n, self.get_num_verts(), -1)
             self.gavs[env_ids] = SkeletonMotion._compute_velocity(p=self.gts[env_ids, :, None, :], time_delta=self._dt, guassian_filter = False)[:, :, 0]
             self.gvs[env_ids] = SkeletonMotion._compute_angular_velocity(r=self.grs[env_ids, :, None, :], time_delta=self._dt, guassian_filter = False)[:, :, 0]
             

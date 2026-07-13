@@ -76,6 +76,7 @@ traj_gen:
   accel_max: 0.5
   sharp_turn_prob: 0.2
   big_obj_mode: False
+  real_traj_path: "data/custom_stick_traj.pkl"
 
 terminationDistance: 0.25
 grab_termination_distance: 0.12
