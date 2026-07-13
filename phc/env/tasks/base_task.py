@@ -179,16 +179,7 @@ class BaseTask():
         self.viewing_env_idx = 0
         self.recorder_camera_handle = 0
         self.recorder_camera_handles = []
-        # self.max_num_camera = 10
-        
-        # for idx, env in enumerate(self.envs):
-        #     self.recorder_camera_handles.append(self.gym.create_camera_sensor(env, gymapi.CameraProperties()))
-        #     if idx > self.max_num_camera:
-        #         break
-    
-        # self.recorder_camera_handle = self.recorder_camera_handles[0]
-        
-        
+
         self.recording, self.recording_state_change = False, False
         self.max_video_queue_size = 100000
         self._video_queue = deque(maxlen=self.max_video_queue_size)
@@ -247,6 +238,40 @@ class BaseTask():
 
     def _record_states(self):
         pass
+
+    def record_frame_headless(self):
+        """Save per-frame simulation state (body joints + object) to disk for offline rendering."""
+        if not flags.auto_record:
+            return
+
+        if not hasattr(self, '_state_frames'):
+            self._state_frames = []
+
+        frame = {}
+        if hasattr(self, '_rigid_body_pos'):
+            frame['body_pos'] = self._rigid_body_pos[0].cpu().numpy().copy()  # (num_bodies, 3)
+        if hasattr(self, '_obj_states'):
+            frame['obj_state'] = self._obj_states[0].cpu().numpy().copy()     # (7,): pos + quat
+        if hasattr(self, '_humanoid_root_states'):
+            frame['root_state'] = self._humanoid_root_states[0].cpu().numpy().copy()  # (13,)
+        self._state_frames.append(frame)
+
+    def _flush_state_frames(self) -> None:
+        """Write accumulated _state_frames to a single npz and clear the buffer."""
+        if not hasattr(self, '_state_frames') or not self._state_frames:
+            return
+        curr_date_time = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
+        out_path = self._video_path.replace('%s', curr_date_time).replace('.mp4', '_states.npz')
+        os.makedirs(osp.dirname(out_path), exist_ok=True)
+        keys = self._state_frames[0].keys()
+        save_dict = {k: np.stack([f[k] for f in self._state_frames]) for k in keys}
+        np.savez(out_path, **save_dict)
+        print(f"============ States saved: {out_path} ({len(self._state_frames)} frames) ============")
+        self._state_frames = []
+
+    def finalize_recording(self):
+        """Save accumulated state frames to a numpy file for offline rendering."""
+        self._flush_state_frames()
 
     def _write_states_to_file(self, file_name):
         pass

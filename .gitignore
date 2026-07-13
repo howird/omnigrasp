@@ -1,3 +1,5 @@
+isaacgym/*
+!isaacgym/pyproject.toml
 
 *.json
 
@@ -119,7 +121,7 @@ celerybeat.pid
 venv/
 env.bak/
 venv.bak/
- 
+
 
 # Rope project settings
 .ropeproject

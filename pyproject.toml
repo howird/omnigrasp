@@ -1,0 +1,65 @@
+[project]
+name = "omnigrasp"
+version = "0.1.0"
+requires-python = "==3.8.*"
+dependencies = [
+    "torch>=1.8.0",
+    "torchvision>=0.9.0",
+    "torchaudio",
+    "mujoco",
+    "pytorch-lightning",
+    "numpy-stl",
+    "vtk",
+    "patchelf",
+    "termcolor",
+    "torchgeometry",
+    "scikit-image",
+    "numpy==1.23.5",
+    "scipy",
+    "ipdb",
+    "joblib>=1.2.0",
+    "opencv-python==4.6.0.66",
+    "tqdm",
+    "pyyaml",
+    "wandb",
+    "gym",
+    "smpl-sim",
+    "lxml",
+    "human-body-prior",
+    "autograd",
+    "scikit-learn",
+    "chumpy",
+    "rl-games==1.1.4",
+    "pyvirtualdisplay",
+    "chardet",
+    "cchardet",
+    "imageio-ffmpeg",
+    "easydict",
+    "open3d",
+    "gdown",
+    "isaacgym",
+    "viser>=1.0.30",
+    "tyro>=1.0.15",
+]
+
+[tool.setuptools.packages.find]
+include = ["phc*"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+isaacgym = { path = "isaacgym" }
+smpl-sim = { git = "https://github.com/ZhengyiLuo/SMPLSim.git", branch = "master" }
+torch = { index = "pytorch-cu118" }
+torchvision = { index = "pytorch-cu118" }
+torchaudio = { index = "pytorch-cu118" }
+
+[tool.uv.extra-build-dependencies]
+chumpy = ["pip"]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true

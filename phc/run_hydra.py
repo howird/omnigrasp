@@ -302,6 +302,7 @@ def main(cfg_hydra: DictConfig) -> None:
     flags.add_proj = cfg.add_proj
     flags.has_eval = cfg.has_eval
     flags.trigger_input = False
+    flags.auto_record = cfg.auto_record
 
     if cfg.server_mode:
         flags.follow = cfg.follow = True

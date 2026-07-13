@@ -284,6 +284,9 @@ class IMAMPPlayerContinuous(amp_players.AMPPlayerContinuous):
                     if render:
                         self.env.render(mode="human")
                         time.sleep(self.render_sleep)
+
+                    if flags.auto_record:
+                        self.env.task.record_frame_headless()
                         
                     all_done_indices = done.nonzero(as_tuple=False)
                     done_indices = all_done_indices[:: self.num_agents]
@@ -291,6 +294,9 @@ class IMAMPPlayerContinuous(amp_players.AMPPlayerContinuous):
                     games_played += done_count
 
                     if done_count > 0:
+                        if flags.auto_record:
+                            self.env.task._flush_state_frames()
+
                         if self.is_rnn:
                             for s in self.states:
                                 s[:, all_done_indices, :] = (
@@ -325,6 +331,9 @@ class IMAMPPlayerContinuous(amp_players.AMPPlayerContinuous):
                             break
 
                     done_indices = done_indices[:, 0]
+
+        if flags.auto_record:
+            self.env.task.finalize_recording()
 
         print(sum_rewards)
         if print_game_res:
@@ -462,7 +471,10 @@ class OmnigraspAMPPlayerContinuous(IMAMPPlayerContinuous):
                     # print(1 - self.terminate_state.sum() / self.terminate_state.shape[0])
                     print(self.config['network_path'])
                     
-                    per_obj_fail_rate_new = humanoid_env._motion_lib.compute_per_obj_fail_rate(humanoid_env._motion_lib._motion_data_keys[~humanoid_env.success_lift[:len(humanoid_env._motion_lib._motion_data_keys)]])
+                    n_keys = len(humanoid_env._motion_lib._motion_data_keys)
+                    lift_mask = ~humanoid_env.success_lift[:n_keys].cpu().numpy().astype(bool)
+                    failed_lift_keys = np.array(humanoid_env._motion_lib._motion_data_keys)[lift_mask]
+                    per_obj_fail_rate_new = humanoid_env._motion_lib.compute_per_obj_fail_rate(failed_lift_keys)
                     print(f"Lift success {humanoid_env.success_lift.sum()/len(humanoid_env.success_lift)}")
                     print("Obj_succ_lift: "," \t".join([f"{k}: {1 - v:.3f}" for k, v in per_obj_fail_rate_new.items()]))
                     
@@ -484,6 +496,8 @@ class OmnigraspAMPPlayerContinuous(IMAMPPlayerContinuous):
                     dump_dir = osp.join(self.config['network_path'], "eval", f"res_{humanoid_env.cfg.env.motion_file.split('/')[-1].split('.')[0]}_{humanoid_env.cfg.epoch}_{datetime.now().strftime('%Y-%m-%d-%H:%M:%S')}.pkl")
                     joblib.dump(eval_dump, dump_dir)
                     print(dump_dir)
+                    if flags.auto_record:
+                        self.env.task.finalize_recording()
                     exit()
 
                 done[:] = 1  # Turning all of the sequences done and reset for the next batch of eval.

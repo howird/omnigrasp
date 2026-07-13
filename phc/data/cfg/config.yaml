@@ -36,6 +36,7 @@ debug: False
 follow: False
 add_proj: False
 real_traj: False
+auto_record: False
 
 hydra:
   job:
